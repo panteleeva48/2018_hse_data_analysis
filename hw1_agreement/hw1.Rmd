@@ -1,0 +1,11 @@
+---
+title: "hw1"
+author: "Ira Panteleeva"
+date: "06 02 2018"
+output: html_document
+---
+
+### 1.1
+''' {r}
+library(tidyverse)
+df
