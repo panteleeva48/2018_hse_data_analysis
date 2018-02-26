@@ -1,0 +1,78 @@
+---
+title: "hw_2"
+author: "Ira Panteleeva"
+date: "26 02 2018"
+output: html_document
+---
+
+### 1.1
+#### Приведите результаты биномиального теста.
+```{r}
+library(tidyverse)
+df <- read.csv("https://raw.githubusercontent.com/agricolamz/2018_data_analysis_for_linguists/master/data/students/panteleeva48/hw2_binomial/hw2_binomial.csv", encoding = 'UTF-8')
+df <- as_tibble(df)
+binomial_test <- binom.test(x = df$k, n = df$n, p = df$prior)
+binomial_test
+```
+### 1.2
+#### Приведите результаты симуляции, используя set.seed(42).
+```{r}
+library(mosaic)
+set.seed(42)
+do(1000)*
+  sum(sample(x = 1:0, 
+             size = df$n, 
+             prob = c(df$prior, 1-df$prior), 
+             replace = TRUE)) -> 
+  simulations
+simulations %>% 
+  mutate(greater = sum >= df$k) %>% 
+  count(greater)
+simulations %>% 
+  ggplot(aes(sum))+
+  geom_density(fill = "lightblue")+
+  geom_vline(xintercept = df$k, linetype = 2)+
+  theme_bw()+
+  labs(title = "Распределение 1000 симуляций с параметрами n = 160, p = 0.34")
+```
+### 1.3
+#### Приведите среднее апостериорного распределения, используя prior как средние априорного распределения, а n как количество элементов для вычисления апостериорного распределения.
+```{r}
+alpha_prior <- df$prior*df$n
+beta_prior <- (1-df$prior)*df$n
+alpha_data <- df$k 
+beta_data <- df$n - df$k
+alpha_post <- alpha_prior + alpha_data
+beta_post <- beta_prior + beta_data
+mean = alpha_post/(alpha_post+beta_post)
+mean
+x <- seq(0, 1, length = 100)
+data_frame(p = rep(x, 3),
+           density = c(dbeta(x, alpha_prior, beta_prior),
+                       dbeta(x, alpha_data, beta_data),
+                       dbeta(x, alpha_post, beta_post)),
+           type = rep(c("prior", "likelihood", "posterior"), each = 100))%>% 
+  ggplot(aes(x = p, y = density, color = type))+
+  geom_line()+
+  theme_bw()
+```
+### 1.4
+#### Приведите среднее апостериорного распределения, используя неинформативное априорное распределение.
+```{r}
+x <- seq(0, 1, length = 100)
+data_frame(p = rep(x, 3),
+           density = c(dbeta(x, 1, 1),
+                       dbeta(x, alpha_data, beta_data),
+                       dbeta(x, alpha_data + 1, beta_data + 1)),
+           type = rep(c("prior", "likelihood", "posterior"), each = 100))%>% 
+  ggplot(aes(x = p, y = density, color = type))+
+  geom_line()+
+  theme_bw()
+alpha_post_2 <- 1 + alpha_data
+beta_post_2 <- 1 + beta_data
+mean_2 <- alpha_post_2/(alpha_post_2+beta_post_2)
+mean_2
+```
+### 1.5
+#### Представим, что Вы пишите статью, напишите короткий абзац, который бы обобщал результаты, полученные в предыдущих заданиях. Не забывайте приводить результаты статистических тестов.
+Биноминальный тест показал вероятность успеха 0.275 (при p-value = 0.095). Она находится в пределах 95%-ого доверительного интервала (0.2074628; 0.3510732), что значит: наше гипотетическое значение является правдоподобным и нулевая гипотеза не может быть отвергнута. При симуляции данных значение вероятности успеха, равное 0.34, сильно отличается от максимальной вероятности. В исследовании было проведено информативное и неинформаивное априорное распределение (в неинформативном априрные $\alpha$ и $\beta$ берутся за 1). Средние апостериорные вероятности равны 0.31 и 0.28 соответственно.
