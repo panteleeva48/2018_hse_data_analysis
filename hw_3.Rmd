@@ -1,0 +1,120 @@
+---
+title: "hw_3"
+author: "Ira Panteleeva"
+date: "06 03 2018"
+output: html_document
+---
+
+### 1.1
+#### Посчитайте среднее употребление слова “сэр” по каждой главе, а потом посчитайте grand mean. Ответ выведите в формате тиббл.
+```{r}
+library(tidyverse)
+library(bootstrap)
+library(mosaic)
+wodehouse <- read.csv('https://raw.githubusercontent.com/agricolamz/2018_data_analysis_for_linguists/master/data/students/panteleeva48/hw3_binomial_ci/hw3_wodehouse.csv', encoding = 'UTF-8')
+wodehouse <- as_tibble(wodehouse)
+
+wodehouse %>% 
+  filter(word == "сэр") %>% 
+  select(chapter) %>% 
+  count(chapter) -> av_sir
+
+wodehouse %>% 
+  group_by(chapter) %>% 
+  count(chapter) -> all_w
+
+av_sir['all_w'] <- all_w$n
+av_sir <- transform(av_sir, av = n/all_w)
+av_sir %>%
+  arrange(desc(av)) -> av_sir
+as_tibble(av_sir)
+
+av_sir %>% 
+  summarise(g_mean = mean(av)) -> grand_mean
+as_tibble(grand_mean)
+```
+
+### 1.2
+#### Посчитайте бутстрэпом доверительный интервал для средней доли слова “сэр” в главах романа и выведите его размер в формате тиббл.
+```{r}
+set.seed(42)
+
+wodehouse_bs <- bootstrap(av_sir$av, nboot = 10000, theta = mean)$thetastar
+wodehouse_bs <- data_frame(means = wodehouse_bs)  
+
+wodehouse_bs %>%
+  summarise(mean = mean(means),
+            q1 = quantile(means, 0.025),
+            q2 = quantile(means, 0.975)) ->
+  wodehouse_stats
+
+wodehouse_bs %>% 
+  ggplot(aes(means)) +
+  geom_histogram(fill = "lightblue")+
+  theme_bw()+
+  labs(title = 'Средняя доля слова "сэр" на основе 14 глав', subtitle = "Среднее и 95% бутстрэпнутый доверительный интервал")+
+  geom_vline(xintercept = unlist(wodehouse_stats), lty = c(2, 3, 3))
+
+wodehouse_stats <- transform(wodehouse_stats, size = q2 - q1)
+as_tibble(wodehouse_stats)
+```
+### 1.3
+#### Посчитайте биномиальный доверительный интервал употребления слова “сэр” в каждой главе и выведите главу с максимальным из интервалов в формате тиббл.
+```{r}
+av_sir %>% 
+  group_by(chapter) %>%
+  mutate(low_ci = binom.test(x = n, n = all_w, ci.method = "Clopper-Pearson")$conf.int[1],
+         up_ci = binom.test(x = n, n = all_w, ci.method = "Clopper-Pearson")$conf.int[2]) -> bin_sir
+
+bin_sir <- transform(bin_sir, length = up_ci - low_ci)
+as_tibble(bin_sir)
+
+max_val = max(bin_sir$length)
+max_ch <- bin_sir[bin_sir$length %in% max_val,]
+max_ch <- select(max_ch, chapter, length)
+as_tibble(max_ch)
+```
+### 1.4
+#### Посчитайте байесовский биномиальный доверительный интервал употребления слова “сэр” в каждой главе и выведите главу с максимальным из интервалов в формате тиббл.
+```{r}
+mu <- mean(av_sir$av)
+var <- var(av_sir$av)
+alpha0 <- ((1 - mu) / var - 1 / mu) * mu ^ 2
+beta0 <- alpha0 * (1 / mu - 1)
+x <- seq(0, 0.1, length = 1000)
+estimation <- data_frame(
+  x = x,
+  density = c(dbeta(x, shape1 = alpha0, shape2 = beta0)))
+
+av_sir %>% 
+  mutate(alpha_post = n+alpha0,
+         beta_post = all_w-n+beta0,
+         average_post = alpha_post/(alpha_post+beta_post),
+         cred_int_l = qbeta(.025, alpha_post, beta_post),
+         cred_int_h = qbeta(.975, alpha_post, beta_post),
+         len = cred_int_h - cred_int_l) -> posterior
+posterior
+max_val2 = max(posterior$len)
+max_ch2 <- posterior[posterior$len %in% max_val2,]
+max_ch2 <- select(max_ch2, chapter, len)
+as_tibble(max_ch2)
+```
+### 1.5
+#### Посчитайте биномиальный доверительный интервал употребления слова “сэр” в каждой главе и выведите главу с минимальным из интервалов в формате тиббл.
+```{r}
+min_val = min(bin_sir$length)
+min_ch <- bin_sir[bin_sir$length %in% min_val,]
+min_ch <- select(min_ch, chapter, length)
+as_tibble(min_ch)
+```
+### 1.6
+#### Посчитайте байесовский биномиальный доверительный интервал употребления слова “сэр” в каждой главе и выведите главу с минимальным из интервалов в формате тиббл.
+```{r}
+min_val2 = min(posterior$len)
+min_ch2 <- posterior[posterior$len %in% min_val2,]
+min_ch2 <- select(min_ch2, chapter, len)
+as_tibble(min_ch2)
+```
+### 1.7
+#### Напишите короткий текст, комментирующий наблюдаемые сходства/различия между оценками среднего и доверительных интервалов количества употреблений слова “сэр” во всех главах романа. Что можно сказать про разные главы? Что можно сказать о сходстве/различиях фриквентистсткой и байесовской оценок наблюдаемых параметров?
+Мы проанализировали употребление слова "сэр" в романе П. Г. Вудхауза "Фамильная честь Вустеров". Количество слов в тексте сильно варьируется по главам (максимальное количество вхождений - в 14 главе (77, среднее - 0.015), минимальное - в 4 (7, 0.00097)). Среднее (grand mean) только по выборке равняется 0.00666, с помощью bootstrap - 0.00665. Так, результаты среднего с помощью разных методов практически одинаковы, что говорит о сбалансированном характере выборки. Фриквентистсткий и байесовский доверительные интервалы также схожи (фриквентистсткий немного больше).
