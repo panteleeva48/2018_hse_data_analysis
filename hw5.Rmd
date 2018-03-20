@@ -1,0 +1,55 @@
+---
+title: "hw5"
+author: "Ira Panteleeva"
+date: "20 03 2018"
+output: html_document
+---
+
+### 1.1
+```{r}
+library(tidyverse)
+library(GGally)
+library(ca)
+library(tidyverse)
+library(dplyr)
+
+chairs <- read.csv("https://raw.githubusercontent.com/agricolamz/2018_data_analysis_for_linguists/master/data/students/panteleeva48/hw5_CA_MCA/hw5_chairs.csv")
+for_mca <- chairs[, -c(1:3)]
+MCA <- MASS::mca(for_mca)
+MCA
+
+chairs <- cbind(chairs, MCA$rs)
+variables <- as_data_frame(MCA$cs)
+variables$var_names <- rownames(MCA$cs)
+chairs %>% 
+  ggplot(aes(`1`, `2`))+
+  geom_point(aes(color = Category))+
+  stat_ellipse(aes(color = Category))+
+  geom_text(data = variables, aes(`1`, `2`, label = var_names), size=2)+
+  theme_bw()+
+  scale_x_continuous(limits = c(-0.02, 0.015))
+```
+### 1.2
+Категории Stuhl и Sessel различаются (есть пару парметров, которые у них схожи: это видно из пересечения, например Back.High (высота спинки)). Параметры, чаще относящиеся к Stuhl, например, Arm.No (отсувие подлокотников), Recline.No (отсувие возможности отклонить спинку); к Sessel - Arm.Yes (наличие подлокотников), AddFunctions.Bed (функция кровати). Такое распределение отражает реальную картину мира.
+### 2.1
+```{r}
+colreg <- read.csv("https://raw.githubusercontent.com/agricolamz/2018_data_analysis_for_linguists/master/data/students/panteleeva48/hw5_CA_MCA/hw5_colreg.csv")
+
+ca <- ca(colreg[-5])
+ca
+colreg_col <- data.frame(ca$colcoord)
+colreg_col$rows <- rownames(ca$colcoord)
+
+colreg_row <- data.frame(ca$rowcoord)
+colreg_row$rows <- colreg$colors
+
+colreg_col %>% 
+  ggplot(aes(Dim1, Dim2, label = rows))+
+  geom_text(color = "blue")+
+  geom_text(data = colreg_row, color = "red")+
+  theme_bw()+
+  labs(x = "Dim1 (77.86%)",
+       y = "Dim2 (19.21%)")
+```
+### 2.2
+Из графика видно, что в академических текстах редко употребляются цвета (все цвета находятся в противоположном углу от academic). В разговорном стиле чаще встречаются базовые цвета (белый, черный). Что касается фикшн и массмедиа, то в них употребляется цвета часто, и в большей степени небазовые, причем в фикшн, как в текстах, написанных более художественным языком, читатель сталкивается с цветами чаще, чем в прессе.
